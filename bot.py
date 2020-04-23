@@ -1,57 +1,38 @@
-from telegram.ext import Updater, MessageHandler, Filters
-from telegram.ext import CallbackContext, CommandHandler
-from telegram import ReplyKeyboardMarkup
+import vk_api
+from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
+import random
+import wikipedia
 
-TOKEN = '1220774917:AAFn0XURWj2_sh5u0srJeukLB5SMOP1kQEY'
-# IP = '184.178.172.5'
-# PORT = '15303'
+wikipedia.set_lang('ru')
 
-# Определяем функцию-обработчик сообщений.
-# У неё два параметра, сам бот и класс updater, принявший сообщение.
-def echo(update, context):
-    # У объекта класса Updater есть поле message,
-    # являющееся объектом сообщения.
-    # У message есть поле text, содержащее текст полученного сообщения,
-    # а также метод reply_text(str),
-    # отсылающий ответ пользователю, от которого получено сообщение.
-    update.message.reply_text('Я получил исходное сообщение ' + update.message.text)
+TOKEN = 'c8609dbab269881672ed0d2af7db0c1571afda27778617fb9f1572a2e2b88007f5bbbcbdcde2bc66c9e4d'
 
 
 def main():
-    # REQUEST_KWARGS = {
-    #     'proxy_url': 'socks5h://{}:{}'.format(IP, PORT),
-    #     # Optional, if you need authentication:
-    #     'urllib3_proxy_kwargs': {
-    #         'assert_hostname': 'False',
-    #         'cert_reqs': 'CERT_NONE'
-    #         # 'username': 'user',
-    #         # 'password': 'password'
-    #     }
-    # }
-    # Создаём объект updater.
-    # Вместо слова "TOKEN" надо разместить полученный от @BotFather токен
-    updater = Updater(token=TOKEN, use_context=True)
+    flag = True
+    vk_session = vk_api.VkApi(
+        token=TOKEN)
 
-    # Получаем из него диспетчер сообщений.
-    dp = updater.dispatcher
+    longpoll = VkBotLongPoll(vk_session, '194027853')
 
-    # Создаём обработчик сообщений типа Filters.text
-    # из описанной выше функции echo()
-    # После регистрации обработчика в диспетчере
-    # эта функция будет вызываться при получении сообщения
-    # с типом "текст", т. е. текстовых сообщений.
-    text_handler = MessageHandler(Filters.text, echo)
+    for event in longpoll.listen():
 
-    # Регистрируем обработчик в диспетчере.
-    dp.add_handler(text_handler)
-    # Запускаем цикл приема и обработки сообщений.
-    updater.start_polling()
-
-    # Ждём завершения приложения.
-    # (например, получения сигнала SIG_TERM при нажатии клавиш Ctrl+C)
-    updater.idle()
+        if event.type == VkBotEventType.MESSAGE_NEW:
+            vk = vk_session.get_api()
+            text = event.obj.message['text'].lower()
+            if flag:
+                vk.messages.send(user_id=event.obj.message['from_id'],
+                                 message="О чем вы хотите узнать?",
+                                 random_id=random.randint(0, 2 ** 64))
+                flag = False
+            else:
+                try:
+                    vk.messages.send(user_id=event.obj.message['from_id'],
+                                     message=wikipedia.summary(text),
+                                     random_id=random.randint(0, 2 ** 64))
+                except:
+                    print('Сформулируйте свой запрос по другому, назовите вещь о коророй хотите узнать')
 
 
-# Запускаем функцию main() в случае запуска скрипта.
 if __name__ == '__main__':
     main()
